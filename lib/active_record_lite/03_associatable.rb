@@ -14,52 +14,42 @@ class AssocOptions
   end
 
   def model_class
-    p @options
-    @options[:class_name].constantize
+    @class_name.constantize
   end
 
   def table_name
-    model_class.to_s.underscore + "s"
+    model_class.table_name
     
   end
-  
-  def foreign_key
-    @options[:foreign_key]
-  end
 
-  def primary_key
-    @options[:primary_key]
-  end
-
-  def class_name
-    @options[:class_name]
-  end
 
 end
 
 class BelongsToOptions < AssocOptions
   def initialize(name, options = {})
-    @options = options
-    if @options[:foreign_key] == nil || @options[:class_name] == nil
-      @options[:foreign_key] ||= "#{name}_id".to_sym
-      @options[:class_name] ||= "#{name.to_s.camelcase}"
-      super()
+    defaults = {
+          :foreign_key => "#{name}_id".to_sym,
+          :class_name => name.to_s.camelcase,
+          :primary_key => :id
+        }
+
+    defaults.keys.each do |key|
+      self.send("#{key}=", options[key] || defaults[key])
     end
-    @options
   end
 end
 
 class HasManyOptions < AssocOptions
   def initialize(name, self_class_name, options = {})
-    @options = options
-    if @options[:foreign_key] == nil || @options[:class_name] == nil
-      @options[:foreign_key] ||= (self_class_name.downcase + "_id").to_sym
-      @options[:class_name] ||= name.to_s.singularize.camelcase
-      super()
-    else
-      @options
+    defaults = {
+      foreign_key: "#{self_class_name.underscore}_id".to_sym,
+      class_name: name.to_s.singularize.camelcase,
+      primary_key: :id
+    }
+    
+    defaults.keys.each do |key|
+      self.send("#{key}=", options[key] || defaults[key])
     end
-    @options
   end
 end
 
@@ -75,10 +65,10 @@ module Associatable
   end
 
   def has_many(name, options = {})
-    options = BelongsToOptions.new(name, options)
+    class_name = self.send(class_name)
+    options = HasManyOptions.new(name, class_name, options)
     define_method "#{name}" do
       f_key = options.foreign_key
-      target_class = options.model_class
       target_class.where(id: f_key).first
     end
   end
